@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlateTrack | Staff Parking Security</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+
+    <div id="app">
+        <section id="login-screen" class="screen active">
+            <div class="login-card">
+                <h2>Welcome to PlateTrack</h2>
+                <p>Staff Parking Access Management</p>
+                <form id="login-form">
+                    <input type="text" id="username" placeholder="Company Username" required>
+                    <input type="password" id="password" placeholder="Password" required>
+                    <button type="submit" class="btn primary" >Login</button>
+                </form>
+                <div id="login-message" class="message error"></div>
+            </div>
+        </section>
+
+        <section id="dashboard-screen" class="screen">
+            <aside class="sidebar">
+                <div class="logo">PlateTrack</div>
+                <nav class="main-nav">
+                    <a href="#" class="nav-item active" data-target="home-view"><span class="material-icons">home</span>Home</a>
+                    <a href="#" class="nav-item" data-target="camera-view"><span class="material-icons">videocam</span>Start Cam</a>
+                    <a href="#" class="nav-item" data-target="register-view"><span class="material-icons">assignment_ind</span>Register Plate</a>
+                    <a href="#" class="nav-item" data-target="data-view"><span class="material-icons">storage</span>Plate Data</a>
+                </nav>
+                <div class="user-profile" id="user-profile-summary">
+                    </div>
+                <button class="btn secondary" id="logout-btn"><span class="material-icons">logout</span>Logout</button>
+            </aside>
+
+            <main class="content">
+                <div id="home-view" class="view active">
+                    <h1>Hello! Welcome to Staff Parking Dashboard</h1>
+                    <p>Quick overview of the company's parking system status.</p>
+                    <div class="metrics">
+                        <div class="metric-card">
+                            <span class="material-icons">directions_car</span>
+                            <h3>Registered Plates</h3>
+                            <p id="total-plates-count">0</p>
+                        </div>
+                        <div class="metric-card">
+                            <span class="material-icons">business</span>
+                            <h3>Company ID</h3>
+                            <p id="company-id">CGS_COMPANY</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="camera-view" class="view">
+                    <h1>Start Live Plate Detection</h1>
+                    <p>Activate the camera for real-time license plate recognition.</p>
+                    <div class="camera-feed-container">
+                        <div class="camera-placeholder">
+                            
+                            <p>Connecting to Python Detection Service...</p>
+                            <button class="btn primary large" onclick="alert('Simulating camera activation and backend connection...');">Activate Camera Feed</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="register-view" class="view">
+                    <h1>Register Staff License Plate</h1>
+                    <p>Use this form to register or update a staff member's car plate.</p>
+                    <form id="register-form" class="card form-card">
+                        <input type="text" id="reg-staff-id" placeholder="Staff ID (e.g., S001)" required>
+                        <input type="text" id="reg-staff-name" placeholder="Staff Name" required>
+                        <input type="text" id="reg-license-plate" placeholder="License Plate (e.g., B-1234-ABC)" required>
+                        <button type="submit" class="btn primary">Register / Update Plate</button>
+                        <div id="register-message" class="message"></div>
+                    </form>
+                </div>
+
+                <div id="data-view" class="view">
+                    <h1>Staff Plate Data</h1>
+                    <p>View, search, and manage all registered staff license plates.</p>
+                    
+                    <div class="search-bar">
+                        <input type="text" id="search-plate" placeholder="Search by License Plate (e.g., B-1234-ABC)">
+                        <span class="material-icons">search</span>
+                    </div>
+
+                    <div class="data-table-container card">
+                        <h3>Registered Staff List</h3>
+                        <table id="plate-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Staff ID</th>
+                                    <th>Staff Name</th>
+                                    <th>License Plate</th>
+                                    <th>Date Registered</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="plate-data-body">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

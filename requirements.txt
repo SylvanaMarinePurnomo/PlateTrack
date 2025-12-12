@@ -1,0 +1,9 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+flask
+ultralytics
+paddleocr
+opencv-python
+numpy
+paddlepaddle
+flask-cors

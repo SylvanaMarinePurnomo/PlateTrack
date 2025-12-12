@@ -11,10 +11,9 @@ let staffData = [
     { id: 'S102', name: 'Gavriella Tjandra', plate: 'B-123-AB', registeredDate: '2023-10-21' },
     { id: 'S103', name: 'Christian Sadikin', plate: 'B-12-ABC', registeredDate: '2023-10-22' },
 ];
-// --- END DATA SIMULATION ---
+
 
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
     const loginScreen = document.getElementById('login-screen');
     const dashboardScreen = document.getElementById('dashboard-screen');
     const loginForm = document.getElementById('login-form');
@@ -24,11 +23,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('register-form');
     const searchInput = document.getElementById('search-plate');
     
-    // Initial Setup
+    const plateReaderForm = document.getElementById('plate-reader-form');
+    const readerMessage = document.getElementById('reader-message');
+    const readerResults = document.getElementById('reader-results');
+    const resultPlateText = document.getElementById('result-plate-text');
+    const resultStatus = document.getElementById('result-status');
+    const resultConfidence = document.getElementById('result-confidence');
+
+    
+
     renderStaffData(staffData);
     updateMetrics();
     
-    // Login/Logout Functionality
+
     loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const usernameInput = document.getElementById('username').value;
@@ -53,11 +60,11 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardScreen.classList.remove('active');
         document.getElementById('username').value = '';
         document.getElementById('password').value = '';
-        // Reset to home view
+
         switchView('home-view');
     });
 
-    // Navigation / View Switching
+
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
@@ -76,13 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.getElementById(target).classList.add('active');
 
-        // Refresh data when switching to data view
+
         if (target === 'data-view') {
             renderStaffData(staffData);
         }
     }
 
-    // Register Staff Car Plate
+
     registerForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const staffId = document.getElementById('reg-staff-id').value.toUpperCase().trim();
@@ -103,19 +110,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const existingStaffIndex = staffData.findIndex(s => s.id === staffId);
         
         if (existingPlateIndex !== -1 && staffData[existingPlateIndex].id !== staffId) {
-             // Plate already registered to a *different* staff
+
             messageDiv.innerHTML = `Plate ${plate} is already registered to Staff ID ${staffData[existingPlateIndex].id}. A plate can only be registered once.`;
             messageDiv.classList.add('error');
             return;
         }
 
         if (existingStaffIndex !== -1) {
-            // Staff ID found: Update plate (feature 5: automatically delete old plate)
             
             const oldPlate = staffData[existingStaffIndex].plate;
 
             if (oldPlate !== plate) {
-                // Update and warn
                 staffData[existingStaffIndex].plate = plate;
                 staffData[existingStaffIndex].name = staffName;
                 staffData[existingStaffIndex].registeredDate = new Date().toISOString().slice(0, 10);
@@ -123,13 +128,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 messageDiv.innerHTML = `Warning: **Updated!** Staff ID **${staffId}** (${staffName})'s plate has been changed from **${oldPlate}** to **${plate}**. (Old plate removed automatically)`;
                 messageDiv.classList.add('warning');
             } else {
-                 // Staff ID found, same plate
-                staffData[existingStaffIndex].name = staffName; // Update name just in case
+                staffData[existingStaffIndex].name = staffName; 
                 messageDiv.innerHTML = `Staff ID **${staffId}** already has plate **${plate}**. Data updated.`;
                 messageDiv.classList.add('success');
             }
         } else {
-            // New Staff ID: Register new entry
             const newStaff = {
                 id: staffId,
                 name: staffName,
@@ -141,13 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
             messageDiv.classList.add('success');
         }
 
-        // Reset form and update metrics/data table
         registerForm.reset();
         updateMetrics(); 
-        // Note: Data table will refresh when user navigates to Data View
+
     });
 
-    // See all & Search Staff’s License Plate Data
     searchInput.addEventListener('input', () => {
         const searchTerm = searchInput.value.toUpperCase().trim();
         const filteredData = staffData.filter(staff => staff.plate.includes(searchTerm));
@@ -175,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Function to handle plate deletion (called from inline onclick)
     window.deleteStaffPlate = function(plateToDelete) {
         if (confirm(`Are you sure you want to delete the registration for plate ${plateToDelete}?`)) {
             staffData = staffData.filter(staff => staff.plate !== plateToDelete);
@@ -185,7 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // User Profile / Home Metrics Update
     function renderUserProfile() {
         const profileDiv = document.getElementById('user-profile-summary');
         profileDiv.innerHTML = `
@@ -202,5 +201,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (profileCountElement) {
             profileCountElement.textContent = count;
         }
+    }
+
+
+    if (plateReaderForm) {
+        plateReaderForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+
+            readerMessage.style.display = 'block';
+            readerMessage.className = 'message';
+            readerMessage.textContent = 'Processing image... Please wait.';
+            readerResults.style.display = 'none';
+
+            const formData = new FormData(this);
+
+
+            fetch('http://127.0.0.1:5000/recognize-plate', { 
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.error || `HTTP error! status: ${response.status}`); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                readerMessage.className = data.status === 'SUCCESS' ? 'message success' : 'message error';
+                readerMessage.textContent = `Processing Complete. Status: ${data.status}`;
+                
+                resultPlateText.textContent = data.plate_text || 'N/A';
+                resultStatus.textContent = data.status;
+                resultConfidence.textContent = data.yolo_confidence !== undefined ? `${(data.yolo_confidence * 100).toFixed(2)}%` : 'N/A';
+                readerResults.style.display = 'block';
+
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                readerMessage.className = 'message error';
+                readerMessage.textContent = `An error occurred: ${error.message}. Ensure the backend server (app.py) is running on http://127.0.0.1:5000.`;
+                readerResults.style.display = 'none';
+            });
+        });
     }
 });

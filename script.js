@@ -7,9 +7,9 @@ const COMPANY_ACCOUNT = {
 };
 
 let staffData = [
-    { id: 'S101', name: 'Sylvana Marine Purnomo', plate: 'B-1234-ABC', registeredDate: '2023-10-20' },
-    { id: 'S102', name: 'Gavriella Tjandra', plate: 'B-123-AB', registeredDate: '2023-10-21' },
-    { id: 'S103', name: 'Christian Sadikin', plate: 'B-12-ABC', registeredDate: '2023-10-22' },
+    { id: 'S101', name: 'Sylvana Marine Purnomo', plate: 'BE1653AAG', registeredDate: '2023-10-20' },
+    { id: 'S102', name: 'Gavriella Tjandra', plate: 'B1030NZQ', registeredDate: '2023-10-21' },
+    { id: 'S103', name: 'Christian Sadikin', plate: 'B12ABC', registeredDate: '2023-10-22' },
 ];
 
 
@@ -29,6 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultPlateText = document.getElementById('result-plate-text');
     const resultStatus = document.getElementById('result-status');
     const resultConfidence = document.getElementById('result-confidence');
+    
+    const accessStatusText = document.getElementById('access-status-text');
 
     
 
@@ -213,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
             readerMessage.className = 'message';
             readerMessage.textContent = 'Processing image... Please wait.';
             readerResults.style.display = 'none';
+            accessStatusText.textContent = ''; 
 
             const formData = new FormData(this);
 
@@ -234,6 +237,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultPlateText.textContent = data.plate_text || 'N/A';
                 resultStatus.textContent = data.status;
                 resultConfidence.textContent = data.yolo_confidence !== undefined ? `${(data.yolo_confidence * 100).toFixed(2)}%` : 'N/A';
+                
+                if (data.access_status) {
+                    accessStatusText.textContent = data.access_status;
+                    if (data.access_status === 'GRANTED') {
+                        accessStatusText.style.fontWeight = 'bold';
+                        accessStatusText.style.color = '#4CAF50';
+                    } else if (data.access_status === 'DENIED') {
+                        accessStatusText.style.fontWeight = 'bold';
+                        accessStatusText.style.color = '#F44336';
+                    } else {
+                        accessStatusText.style.color = 'inherit';
+                    }
+                } else {
+                    accessStatusText.textContent = 'Unknown';
+                    accessStatusText.style.color = 'inherit';
+                }
+                
                 readerResults.style.display = 'block';
 
             })

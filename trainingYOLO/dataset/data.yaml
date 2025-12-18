@@ -1,0 +1,14 @@
+
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['License_Plate', 'cars', 'motorcycle']
+
+roboflow:
+  workspace: praproject
+  project: indonesia-lpr
+  version: 8
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/praproject/indonesia-lpr/dataset/8

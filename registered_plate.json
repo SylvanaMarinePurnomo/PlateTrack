@@ -1,0 +1,21 @@
+[
+  {
+    "id": "S101",
+    "name": "Sylvana Marine Purnomo",
+    "plate": "B1234ABC",
+    "registeredDate": "2023-10-20"
+  },
+  {
+    "id": "S102",
+    "name": "Gavriella Tjandra",
+    "plate": "B1970SSW", 
+    "registeredDate": "2023-10-20"
+
+},
+   {
+    "id": "S103",
+    "name": "Christian Sadikin",
+    "plate": "B125AB",
+    "registeredDate": "2023-10-20"
+  }
+]

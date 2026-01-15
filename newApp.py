@@ -144,8 +144,8 @@ async def websocket_endpoint(ws: WebSocket):
                     if crop.size == 0:
                         continue
                     
-                    cv2.imshow("PLATE CROP DEBUG", crop)
-                    cv2.waitKey(0)
+                    # cv2.imshow("PLATE CROP DEBUG", crop)
+                    # cv2.waitKey(0)
 
                     # gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                     # gray = cv2.bilateralFilter(gray, 9, 75, 75)
@@ -174,7 +174,9 @@ async def websocket_endpoint(ws: WebSocket):
                         "bbox": [x1, y1, x2, y2],
                         "plate": match if match else cleaned,
                         "confidence": conf,
-                        "authorized": match is not None
+                        "authorized": match is not None,
+                        "ocr_raw": raw,
+                        "ocr_cleaned": cleaned
                     })
            
             await ws.send_json({

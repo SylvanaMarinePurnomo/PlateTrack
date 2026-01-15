@@ -7,16 +7,19 @@ let video = null;
 let canvas = null;
 let ctx = null;
 
-const SEND_INTERVAL = 400; 
+const SEND_INTERVAL = 2000; 
 let currentDetections = [];
 
+let detectionBuffer = [];
+const BUFFER_SIZE = 10;
+const AUTHORIZATION_THRESHOLD = 1;
 
 const deniedPlates = [];
 
 
 let isCameraRunning = false;
 let lastAuthorizedPlate = null;
-
+let foundAuthorizedPlate = false;
 const COMPANY_ACCOUNT = {
     username: "CGS_Company",
     password: "123",
@@ -70,6 +73,7 @@ function drawDetections(detections = currentDetections) {
 
 function handleWebSocketMessage(event) {
     if (!isCameraRunning) return;
+    if (foundAuthorizedPlate) return;
 
     let data;
     try {
@@ -79,10 +83,11 @@ function handleWebSocketMessage(event) {
         return;
     }
 
-   
     if (data.type === "reset") {
         currentDetections = [];
         lastAuthorizedPlate = null;
+        foundAuthorizedPlate = false;
+        detectionBuffer = [];
         clearCanvas();
         resetUI();
         return;
@@ -92,55 +97,122 @@ function handleWebSocketMessage(event) {
 
     const detections = data.results;
     currentDetections = detections;
-
-   
     drawDetections(detections);
 
     if (detections.length === 0) return;
 
     detections.forEach(det => {
+        console.log("=== DETECTION DEBUG ===");
+        console.log("OCR Raw:", det.ocr_raw);
+        console.log("OCR Cleaned:", det.ocr_cleaned);
+        console.log("Final Match:", det.plate);
+        console.log("Authorized:", det.authorized);
+        console.log("Confidence:", det.confidence);
 
-       
+        const ocrRawEl = document.getElementById("ocr-raw");
+        const ocrCleanedEl = document.getElementById("ocr-cleaned");
+        const ocrMatchedEl = document.getElementById("ocr-matched");
+        const ocrAuthEl = document.getElementById("ocr-authorized");
         const confEl = document.getElementById("result-confidence");
+
+        if (ocrRawEl) {
+            ocrRawEl.textContent = det.ocr_raw || "N/A";
+            ocrRawEl.style.fontSize = "18px";
+            ocrRawEl.style.fontWeight = "bold";
+        }
+        if (ocrCleanedEl) {
+            ocrCleanedEl.textContent = det.ocr_cleaned || "N/A";
+            ocrCleanedEl.style.fontSize = "18px";
+            ocrCleanedEl.style.fontWeight = "bold";
+        }
+        if (ocrMatchedEl) {
+            ocrMatchedEl.textContent = det.plate || "UNKNOWN";
+            ocrMatchedEl.style.fontSize = "18px";
+            ocrMatchedEl.style.fontWeight = "bold";
+        }
+        if (ocrAuthEl) {
+            ocrAuthEl.textContent = det.authorized ? "YES" : "NO";
+            ocrAuthEl.style.color = det.authorized ? "green" : "red";
+            ocrAuthEl.style.fontSize = "18px";
+            ocrAuthEl.style.fontWeight = "bold";
+        }
         if (confEl) {
             confEl.textContent = `${(det.confidence * 100).toFixed(2)}%`;
         }
 
 
-        if (det.authorized) {
-           // authorized
-            if (lastAuthorizedPlate === det.plate) return;
-            lastAuthorizedPlate = det.plate;
+        detectionBuffer.push({
+            plate: det.plate,
+            authorized: det.authorized,
+            confidence: det.confidence,
+            timestamp: Date.now()
+        });
 
-            const staff = staffData.find(s => s.plate === det.plate);
-            if (!staff) return;
 
-        
-            const plateEl = document.getElementById("result-plate-text");
-            const statusEl = document.getElementById("access-status-text");
-            const resultEl = document.getElementById("result-status");
+        if (detectionBuffer.length > BUFFER_SIZE) {
+            detectionBuffer.shift();
+        }
 
-            if (plateEl) plateEl.textContent = staff.plate;
-            if (statusEl) {
-                statusEl.textContent = "GRANTED";
-                statusEl.style.color = "green";
+
+        const authorizedReads = detectionBuffer.filter(d => d.authorized);
+        const authorizedCount = authorizedReads.length;
+
+
+        const readerMessage = document.getElementById("reader-message");
+        if (readerMessage && !foundAuthorizedPlate) {
+            readerMessage.style.display = "block";
+            readerMessage.className = "message";
+            readerMessage.textContent = `Scanning... (${detectionBuffer.length}/${BUFFER_SIZE} reads, ${authorizedCount} authorized)`;
+        }
+
+
+        if (authorizedCount >= AUTHORIZATION_THRESHOLD && !foundAuthorizedPlate) {
+            const firstAuthorized = authorizedReads[0];
+            const bestPlate = firstAuthorized.plate;
+
+            foundAuthorizedPlate = true;
+            lastAuthorizedPlate = bestPlate;
+
+            const staff = staffData.find(s => s.plate === bestPlate);
+            if (staff) {
+                const plateEl = document.getElementById("result-plate-text");
+                const statusEl = document.getElementById("access-status-text");
+                const resultEl = document.getElementById("result-status");
+
+                if (plateEl) plateEl.textContent = staff.plate;
+                if (statusEl) {
+                    statusEl.textContent = "GRANTED";
+                    statusEl.style.color = "green";
+                }
+                if (resultEl) resultEl.textContent = `${staff.name} (${staff.id})`;
+
+                console.log(`ACCESS GRANTED: ${staff.name} after ${detectionBuffer.length} reads`);
+                
+                if (readerMessage) {
+                    readerMessage.className = "message success";
+                    readerMessage.textContent = `Access Granted: ${staff.name} (${staff.plate})`;
+                }
+
+                setTimeout(() => {
+                    stopCamera();
+                }, 2000);
             }
-            if (resultEl) resultEl.textContent = `${staff.name} (${staff.id})`;
+            return; 
+        }
 
-
-        } else {
-            //denied 
-            if (det.plate && !deniedPlates.includes(det.plate)) {
-                deniedPlates.push(det.plate);
+        if (detectionBuffer.length >= BUFFER_SIZE && authorizedCount === 0) {
+            console.log(`ACCESS DENIED: 0 authorized reads in ${BUFFER_SIZE} attempts`);
+            
+            if (readerMessage) {
+                readerMessage.className = "message error";
+                readerMessage.textContent = `Access Denied - No authorized plate detected in ${BUFFER_SIZE} attempts`;
             }
 
-           
-            const statusEl = document.getElementById("access-status-text");
-            if (statusEl) {
-                statusEl.textContent = "DENIED";
-                statusEl.style.color = "red";
-            }
-
+            foundAuthorizedPlate = true;
+            
+            setTimeout(() => {
+                stopCamera();
+            }, 2000);
         }
     });
 }
@@ -167,6 +239,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const conf = document.getElementById("result-confidence");
         const status = document.getElementById("access-status-text");
         const result = document.getElementById("result-status");
+        const ocrRaw = document.getElementById("ocr-raw");
+        const ocrCleaned = document.getElementById("ocr-cleaned");
+        const ocrMatched = document.getElementById("ocr-matched");
+        const ocrAuth = document.getElementById("ocr-authorized");
 
         if (!plate || !conf || !status || !result) return;
 
@@ -174,6 +250,10 @@ document.addEventListener('DOMContentLoaded', () => {
         conf.textContent = "N/A";
         status.textContent = "";
         result.textContent = "";
+        if (ocrRaw) ocrRaw.textContent = "-";
+        if (ocrCleaned) ocrCleaned.textContent = "-";
+        if (ocrMatched) ocrMatched.textContent = "-";
+        if (ocrAuth) ocrAuth.textContent = "-";
     }
 
   
@@ -191,6 +271,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let detectInterval = null;
 
     async function startCamera() {
+        foundAuthorizedPlate = false;
+        lastAuthorizedPlate = null;
+        currentDetections = [];
+        detectionBuffer = []; 
+        
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = cameraStream;
         await video.play();
@@ -198,19 +283,31 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             initWebSocket();
         }
 
         isCameraRunning = true;   
         isDetecting = true;
+        
+        clearCanvas();
+        resetUI();
+        
+        const readerMessage = document.getElementById("reader-message");
+        if (readerMessage) {
+            readerMessage.style.display = "block";
+            readerMessage.className = "message";
+            readerMessage.textContent = "Camera started. Collecting 10 reads...";
+        }
+        
         requestAnimationFrame(processFrame);
     }
 
     function stopCamera() {
         isDetecting = false;
         isCameraRunning = false; 
+        foundAuthorizedPlate = false;
+        detectionBuffer = []; 
 
         if (cameraStream) {
             cameraStream.getTracks().forEach(track => track.stop());
@@ -229,7 +326,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function processFrame(timestamp) {
-       
+        if (foundAuthorizedPlate) {
+            drawDetections(); 
+            return; 
+        }
         if (!isDetecting || !isCameraRunning) return;
 
         const now = Date.now();

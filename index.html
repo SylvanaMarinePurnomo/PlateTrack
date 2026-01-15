@@ -56,25 +56,47 @@
                 </div>
 
                 <div id="camera-view" class="view">
-                    <h1>Plate Reader Security Check</h1>
-                    <p>Upload an image of a license plate for automatic detection and OCR reading.</p>
-
-                    <div class="card form-container">
-                        <form id="plate-reader-form" enctype="multipart/form-data">
-                            <label for="plate-image" class="input-label">Select Plate Image File:</label>
-                            <input type="file" id="plate-image" name="file" accept="image/*" required>
-                            <button type="submit" class="btn primary">Process Plate</button>
-                        </form>
-
-                        <div id="reader-message" class="message" style="display: none;"></div>
+                   
+                     <h1>Plate Reader Security Check</h1>
+                    
+                    <div class="card form-container" style="position: relative; width: 640px;">
                         
-                        <div id="reader-results" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: none;">
-                            <h3>Detection Results</h3>
-                            <p><strong>Plate Text (Matched):</strong> <span id="result-plate-text"></span></p>
-                            <p><strong>YOLO Status:</strong> <span id="result-status"></span></p>
-                            <p><strong>Confidence:</strong> <span id="result-confidence"></span></p>
-                            <p><strong>Access Status:</strong> <span id="access-status-text"></span></p>
+                    
+                        <video
+                            id="camera"
+                            autoplay
+                            playsinline
+                            width="640"
+                            height="480"
+                            style="border-radius: 8px; background: black;"
+                        ></video>
+
+                        <canvas
+                            id="overlay"
+                            width="640"
+                            height="480"
+                            style="
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                pointer-events: none;
+                            "
+                        ></canvas>
+
+                        <div style="margin-top: 12px; display: flex; gap: 10px;">
+                            <button id="start-detect" class="btn primary">
+                                Start Detect
+                            </button>
+                            <button id="stop-detect" class="btn secondary">
+                                Stop
+                            </button>
                         </div>
+
+                        <div
+                            id="reader-message"
+                            class="message"
+                            style="margin-top: 12px; display: none;"
+                        ></div>
                     </div>
                 </div>
                 <div id="register-view" class="view">

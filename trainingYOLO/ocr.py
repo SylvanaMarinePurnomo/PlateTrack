@@ -1,182 +1,203 @@
-import warnings
+import os
 import cv2
 import numpy as np
-import os
-import csv
-import glob
-import time
 from paddleocr import PaddleOCR
-from ultralytics import YOLO
+import re
 
 
-warnings.filterwarnings('ignore')
+ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
 
 
-MODEL_PATH = "runs/detect/train_lpr5/weights/best.pt" 
-INPUT_DIR = "dataset/test/images" 
-OUTPUT_DIR = "pipeline_results" 
-CSV_FILE_NAME = "lpr_summary_full_run.csv" 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+TEST_IMAGES_DIR = "test/images"
+TEST_LABELS_DIR = "test/labels"
 
+def extract_license_plate(text):
 
-def get_best_ocr_result_paddleocr(ocr_results):
-
-    if not ocr_results or not isinstance(ocr_results, list) or not ocr_results[0]:
-        return None
-
-
-    first_result_list = ocr_results[0]
+    cleaned = re.sub(r"[^A-Z0-9]", "", text.upper())
     
-    recognized_text = ""
+    if not cleaned:
+        return ""
     
 
-    for box_info in first_result_list:
-        if isinstance(box_info, list) and len(box_info) == 2:
-
-            text_result = box_info[1]
-            if isinstance(text_result, tuple) and len(text_result) == 2:
-                recognized_text += str(text_result[0])
-
-
-    cleaned_text = recognized_text.strip().replace(' ', '').upper()
-    
-    return cleaned_text
-
-
-def run_yolo_to_paddle_pipeline(img_path, plate_model, ocr_engine):
-
-    img = cv2.imread(img_path)
-    if img is None:
-        return "ERROR_READING_IMAGE", "N/A", 0.0
-
-
-    results = plate_model(img, verbose=False)[0] 
-    
-    if not results.boxes or len(results.boxes) == 0:
-        return "NO_DETECTION", "N/A", 0.0
-
-    best_box = None
-    best_conf = 0.0
-    
-    for box in results.boxes:
-        conf = box.conf.item()
-        if conf > best_conf:
-            best_conf = conf
-            best_box = box.xyxy[0].cpu().numpy().astype(int)
-
-    if best_box is None:
-        return "NO_DETECTION", "N/A", 0.0
-
-    x1, y1, x2, y2 = best_box
+    patterns = [
+        r'([A-Z]{1,2}\d{1,4}[A-Z]{1,3})', 
+    ]
     
 
-    h, w, _ = img.shape
+    all_matches = []
+    for pattern in patterns:
+        matches = re.findall(pattern, cleaned)
+        for match in matches:
+            if 6 <= len(match) <= 9:
+                all_matches.append(match)
     
 
-    pad_h = int((y2 - y1) * 0.1)
-    pad_w = int((x2 - x1) * 0.1)
-
-    x1_pad = max(0, x1 - pad_w)
-    y1_pad = max(0, y1 - pad_h)
-    x2_pad = min(w, x2 + pad_w)
-    y2_pad = min(h, y2 + pad_h)
+    if all_matches:
+        return all_matches[0]
     
-    plate_crop = img[y1_pad:y2_pad, x1_pad:x2_pad]
+    if len(cleaned) >= 6:
+        for start in range(min(3, len(cleaned))):
+            for length in [8, 7, 6, 9]:
+                if start + length <= len(cleaned):
+                    candidate = cleaned[start:start + length]
+                    if (candidate[0].isalpha() and 
+                        any(c.isdigit() for c in candidate) and
+                        candidate[-1].isalpha()):
+                        if re.match(r'^[A-Z]{1,2}\d+[A-Z]{1,3}$', candidate):
+                            return candidate
     
-    if plate_crop.size == 0:
-        return "READ_FAILED_AFTER_DETECTION", "N/A", best_conf
+    return ""
 
-    try:
-        ocr_results = ocr_engine.ocr(plate_crop, det=False, cls=False, rec=True)
-        ocr_result = get_best_ocr_result_paddleocr(ocr_results)
+def get_best_ocr_text(ocr_results):
+    if not ocr_results or not isinstance(ocr_results, list):
+        return ""
+
+    block = ocr_results[0]
+
+    if isinstance(block, dict) and "rec_texts" in block:
+        return "".join(block["rec_texts"]).replace(" ", "").upper()
+
+    return ""
+
+def calculate_cer(reference, hypothesis):
+    ref = reference.upper().strip()
+    hyp = hypothesis.upper().strip()
+
+    d = np.zeros((len(ref) + 1, len(hyp) + 1), dtype=int)
+    
+    for i in range(len(ref) + 1):
+        d[i][0] = i
+    for j in range(len(hyp) + 1):
+        d[0][j] = j
+    
+    for i in range(1, len(ref) + 1):
+        for j in range(1, len(hyp) + 1):
+            if ref[i-1] == hyp[j-1]:
+                cost = 0
+            else:
+                cost = 1
+            
+            d[i][j] = min(
+                d[i-1][j] + 1,
+                d[i][j-1] + 1,
+                d[i-1][j-1] + cost
+            )
+    
+    edit_distance = d[len(ref)][len(hyp)]
+    
+    if len(ref) == 0:
+        return 0.0 if len(hyp) == 0 else float('inf')
+    
+    cer = edit_distance / len(ref)
+    return cer
+
+def read_label(label_path):
+    with open(label_path, 'r', encoding='utf-8') as f:
+        return f.read().strip()
+
+def test_ocr():
+
+    print("=" * 60)
+    print("OCR Character Error Rate (CER) Testing")
+    print("=" * 60)
+    
+
+    image_files = sorted([f for f in os.listdir(TEST_IMAGES_DIR) if f.endswith(('.jpg', '.jpeg', '.png'))])
+    
+
+    
+    total_cer = 0
+    correct_count = 0
+    total_count = 0
+    failed_extractions = 0
+    valid_cer_count = 0
+    results = []
+    
+    for img_file in image_files:
+        file_num = os.path.splitext(img_file)[0]
         
-        if ocr_result and len(ocr_result) > 1: 
-             return "SUCCESS", ocr_result, best_conf
+        img_path = os.path.join(TEST_IMAGES_DIR, img_file)
+        label_path = os.path.join(TEST_LABELS_DIR, f"{file_num}.txt")
+        
+        img = cv2.imread(img_path)
+
+        ground_truth = read_label(label_path)
+        
+
+        try:
+            ocr_res = ocr_engine.ocr(img)
+            raw_ocr = get_best_ocr_text(ocr_res)
+            extracted_ocr = extract_license_plate(raw_ocr)
+        except Exception as e:
+            print(f"OCR Error on {img_file}: {e}")
+            raw_ocr = ""
+            extracted_ocr = ""
+        
+
+        cleaned_ground_truth = extract_license_plate(ground_truth)
+        
+
+        is_failed_extraction = (extracted_ocr == "" or len(extracted_ocr) < 6)
+        
+
+        if is_failed_extraction:
+            cer = float('inf')
+            failed_extractions += 1
         else:
-             return "READ_FAILED_AFTER_DETECTION", ocr_result, best_conf
-            
-    except Exception as e:
-        return f"OCR_ENGINE_ERROR", str(e), best_conf
-    
-
-
-def main_pipeline_run():
-
-    try:
-
-        plate_model = YOLO(MODEL_PATH)
-
-        ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
-    except Exception as e:
-        print(f"Error loading models: {e}")
-        print("Please ensure your YOLO model path is correct and PaddleOCR is installed.")
-        return
-
-
-    file_list = glob.glob(os.path.join(INPUT_DIR, "*"))
-    if not file_list:
-        print(f"No images found in {INPUT_DIR}. Please check the path.")
-        return
-
-    print(f"Starting YOLO-PaddleOCR pipeline on {len(file_list)} images...")
-    all_results_data = []
-    
-    total_time = 0
-    success_count = 0
-    no_detection_count = 0
-    read_fail_count = 0
-    
-    for i, img_path in enumerate(file_list):
-        base_name = os.path.basename(img_path)
+            cer = calculate_cer(cleaned_ground_truth, extracted_ocr)
+            total_cer += cer
+            valid_cer_count += 1
         
-        start_time = time.time()
-        status, ocr_result, yolo_confidence = run_yolo_to_paddle_pipeline(img_path, plate_model, ocr_engine)
-        end_time = time.time()
- 
-        execution_time = end_time - start_time
-        total_time += execution_time
-        
-        if status == "SUCCESS":
-            success_count += 1
-        elif status == "NO_DETECTION":
-            no_detection_count += 1
-        elif "FAILED" in status or "ERROR" in status:
-            read_fail_count += 1
-            
 
-        all_results_data.append({
-            'File Name': base_name,
-            'Status': status,
-            'OCR Result': ocr_result,
-            'YOLO Detection Confidence': f"{yolo_confidence:.4f}" if status == "SUCCESS" else "N/A",
-            'Execution Time (s)': f"{execution_time:.4f}"
+        is_correct = (extracted_ocr == cleaned_ground_truth) and not is_failed_extraction
+        if is_correct:
+            correct_count += 1
+        
+        total_count += 1
+        
+
+        results.append({
+            'file': img_file,
+            'ground_truth': cleaned_ground_truth,
+            'raw_ocr': raw_ocr,
+            'extracted_ocr': extracted_ocr,
+            'cer': cer,
+            'correct': is_correct,
+            'failed_extraction': is_failed_extraction
         })
         
-        print(f"[{i+1}/{len(file_list)}] {base_name}: Status={status}, Read Plate={ocr_result} (Time: {execution_time:.4f}s)")
+        if is_failed_extraction:
+            cer_display = "FAIL"
+        elif is_correct:
+            cer_display = f"{cer:.4f} ({cer*100:.2f}%)"
+        else:
+            cer_display = f"{cer:.4f} ({cer*100:.2f}%)"
+            
+        print(f"\nTest {file_num}: {img_file}")
+        print(f"Ground Truth: {cleaned_ground_truth}")
+        print(f"Extracted OCR:{extracted_ocr if extracted_ocr else '(empty)'}")
+        print(f"CER: {cer_display}")
     
 
-    output_file_path = os.path.join(OUTPUT_DIR, CSV_FILE_NAME)
-    fieldnames = ['File Name', 'Status', 'OCR Result', 'YOLO Detection Confidence', 'Execution Time (s)']
-
-    with open(output_file_path, 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(all_results_data)
-
-
-    total_images = len(file_list)
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
     
-    avg_time = total_time / total_images if total_images > 0 else 0
-    dsr = (total_images - no_detection_count) / total_images * 100 if total_images > 0 else 0
-    ocr_cr = success_count / total_images * 100 if total_images > 0 else 0
-
-    print(f"Total Images Processed: {total_images}")
-    print(f"Total Successful Reads: {success_count} (OCR Completion Rate: {ocr_cr:.2f}%)")
-    print(f"Total No Detections: {no_detection_count}")
-    print(f"Detection Success Rate (DSR): {dsr:.2f}%")
-    print(f"Average Execution Time: {avg_time:.4f} seconds (Target: <= 0.65s)")
-    print(f"Detailed results saved to: {output_file_path}")
-
+    if total_count > 0:
+        accuracy = (correct_count / total_count) * 100
+        incorrect_rate = (total_count - correct_count - failed_extractions) / total_count * 100
+        failed_rate = (failed_extractions / total_count) * 100
+        
+        print(f"Correct: ({accuracy:.2f}%)")
+        print(f"Incorrect: ({incorrect_rate:.2f}%)")
+        print(f"Failed: ({failed_rate:.2f}%)")
+        
+        if valid_cer_count > 0:
+            avg_cer = total_cer / valid_cer_count
+            print(f"\nAverage CER (valid extractions only / fails not included): {avg_cer:.4f} ({avg_cer*100:.2f}%)")
+        else:
+            print(f"\nAverage CER: N/A (no valid extractions)")
+        
 
 if __name__ == "__main__":
-    main_pipeline_run()
+    test_ocr()

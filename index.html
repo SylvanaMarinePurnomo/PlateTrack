@@ -56,24 +56,64 @@
                 </div>
 
                 <div id="camera-view" class="view">
-                    <h1>Start Live Plate Detection</h1>
-                    <p>Activate the camera for real-time license plate recognition.</p>
-                    <div class="camera-feed-container">
-                        <div class="camera-placeholder">
-                            
-                            <p>Connecting to Python Detection Service...</p>
-                            <button class="btn primary large" onclick="alert('Simulating camera activation and backend connection...');">Activate Camera Feed</button>
+                   
+                     <h1>Plate Reader Security Check</h1>
+                    
+                    <div class="card form-container" style="position: relative; width: 640px;">
+                        
+                    
+                        <video
+                            id="camera"
+                            autoplay
+                            playsinline
+                            width="640"
+                            height="480"
+                            style="border-radius: 8px; background: black;"
+                        ></video>
+
+                        <canvas
+                            id="overlay"
+                            width="640"
+                            height="480"
+                            style="
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                pointer-events: none;
+                            "
+                        ></canvas>
+
+                        <div style="margin-top: 12px; display: flex; gap: 10px;">
+                            <button id="start-detect" class="btn primary">
+                                Start Detect
+                            </button>
+                            <button id="stop-detect" class="btn secondary">
+                                Stop
+                            </button>
+                        </div>
+
+                        <div
+                            id="reader-message"
+                            class="message"
+                            style="margin-top: 12px; display: none;"
+                        ></div>
+
+                        <div class="card" style="margin-top: 16px; padding: 16px;">
+                            <div style="display: grid; gap: 8px;">
+                                <p><strong>Final Match:</strong> <span id="ocr-matched" style="color: #666;">-</span></p>
+                                <p><strong>Authorized:</strong> <span id="ocr-authorized" style="color: #666;">-</span></p>
+                                <p><strong>Confidence:</strong> <span id="result-confidence" style="color: #666;">N/A</span></p>
+                            </div>
                         </div>
                     </div>
                 </div>
-
                 <div id="register-view" class="view">
                     <h1>Register Staff License Plate</h1>
                     <p>Use this form to register or update a staff member's car plate.</p>
                     <form id="register-form" class="card form-card">
                         <input type="text" id="reg-staff-id" placeholder="Staff ID (e.g., S001)" required>
                         <input type="text" id="reg-staff-name" placeholder="Staff Name" required>
-                        <input type="text" id="reg-license-plate" placeholder="License Plate (e.g., B-1234-ABC)" required>
+                        <input type="text" id="reg-license-plate" placeholder="License Plate (e.g., B1234ABC)" required>
                         <button type="submit" class="btn primary">Register / Update Plate</button>
                         <div id="register-message" class="message"></div>
                     </form>
@@ -84,7 +124,7 @@
                     <p>View, search, and manage all registered staff license plates.</p>
                     
                     <div class="search-bar">
-                        <input type="text" id="search-plate" placeholder="Search by License Plate (e.g., B-1234-ABC)">
+                        <input type="text" id="search-plate" placeholder="Search by License Plate (e.g., B1234ABC)">
                         <span class="material-icons">search</span>
                     </div>
 

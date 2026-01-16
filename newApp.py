@@ -5,6 +5,9 @@ import cv2
 import numpy as np
 import re
 import base64
+import json
+import os
+
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,10 +18,32 @@ from ultralytics import YOLO
 
 MODEL_PATH = "weights/best.pt"
 
-TRUSTED_PLATES = [
-    "BE1653AAG",
-    "B1030NZQ",
-]
+
+TRUSTED_PLATES_FILE = "trusted_plates.json"
+
+def load_trusted_plates():
+    if not os.path.exists(TRUSTED_PLATES_FILE):
+        return []
+
+    try:
+        with open(TRUSTED_PLATES_FILE, "r") as f:
+            content = f.read().strip()
+            if not content:
+                return []
+            return json.loads(content)
+    except json.JSONDecodeError:
+        print("[WARN] trusted_plates.json invalid or empty, resetting")
+        return []
+
+
+
+def save_trusted_plates(plates):
+    with open(TRUSTED_PLATES_FILE, "w") as f:
+        json.dump(plates, f, indent=2)
+
+
+TRUSTED_PLATES = load_trusted_plates()
+print("Trusted plates loaded:", TRUSTED_PLATES)
 
 EDIT_DISTANCE_THRESHOLD = 2
 
@@ -99,7 +124,38 @@ async def websocket_endpoint(ws: WebSocket):
         while True:
             data = await ws.receive_json()
 
+            if data.get("type") == "add_trusted_plate":
+                plate = data.get("plate", "").upper()
+
+                if plate and plate not in TRUSTED_PLATES:
+                    TRUSTED_PLATES.append(plate)
+                    save_trusted_plates(TRUSTED_PLATES)
+                    print(f"[TRUSTED] Plate added: {plate}")
+                else:
+                    print(f"[TRUSTED] Plate ignored: {plate}")
+
+                await ws.send_json({
+                    "type": "trusted_update",
+                    "plates": TRUSTED_PLATES
+                })
+                continue
             
+            if data.get("type") == "remove_trusted_plate":
+                plate = data.get("plate", "").upper()
+
+                if plate in TRUSTED_PLATES:
+                    TRUSTED_PLATES.remove(plate)
+                    save_trusted_plates(TRUSTED_PLATES)
+                    print(f"[TRUSTED] Plate removed: {plate}")
+                else:
+                    print(f"[TRUSTED] Plate not found: {plate}")
+
+                await ws.send_json({
+                    "type": "trusted_update",
+                    "plates": TRUSTED_PLATES
+                })
+                continue
+
             if data.get("type") == "stop":
                 await ws.send_json({
                     "type": "reset"
@@ -144,12 +200,6 @@ async def websocket_endpoint(ws: WebSocket):
                     if crop.size == 0:
                         continue
                     
-                    # cv2.imshow("PLATE CROP DEBUG", crop)
-                    # cv2.waitKey(0)
-
-                    # gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                    # gray = cv2.bilateralFilter(gray, 9, 75, 75)
-                    # _, gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
                     raw = ""
                     cleaned = ""

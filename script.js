@@ -26,12 +26,7 @@ const COMPANY_ACCOUNT = {
     companyName: "Staff-First Parking Services",
     companyId: "CGS-001"
 };
-
-let staffData = [
-    { id: 'S101', name: 'Sylvana Marine Purnomo', plate: 'BE1653AAG', registeredDate: '2023-10-20' },
-    { id: 'S102', name: 'Gavriella Tjandra', plate: 'B1030NZQ', registeredDate: '2023-10-21' },
-    { id: 'S103', name: 'Christian Sadikin', plate: 'B12ABC', registeredDate: '2023-10-22' },
-];
+let staffData = JSON.parse(localStorage.getItem("staffData")) || [];
 
 function initWebSocket() {
     ws = new WebSocket("ws://127.0.0.1:5000/ws");
@@ -219,6 +214,8 @@ function handleWebSocketMessage(event) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
+    initWebSocket(); 
+
     const loginScreen = document.getElementById('login-screen');
     const dashboardScreen = document.getElementById('dashboard-screen');
     const loginForm = document.getElementById('login-form');
@@ -229,6 +226,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const registerForm = document.getElementById('register-form');
     const searchInput = document.getElementById('search-plate');
+
+    registerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const id = document.getElementById('reg-staff-id').value.trim();
+        const name = document.getElementById('reg-staff-name').value.trim();
+        const plate = document.getElementById('reg-license-plate').value
+            .toUpperCase()
+            .replace(/\s+/g, '');
+
+        const messageEl = document.getElementById('register-message');
+
+        const existing = staffData.find(s => s.plate === plate);
+
+        if (existing) {
+            messageEl.textContent = 'License plate already registered.';
+            messageEl.className = 'message error';
+            return;
+        }
+
+        staffData.push({
+            id,
+            name,
+            plate,
+            registeredDate: new Date().toISOString().split('T')[0]
+        });
+        
+        localStorage.setItem("staffData", JSON.stringify(staffData));
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "add_trusted_plate",
+                plate: plate
+            }));
+        }
+
+        messageEl.textContent = 'Plate registered successfully.';
+        messageEl.className = 'message success';
+
+        registerForm.reset();
+        renderStaffData(staffData);
+        updateMetrics();
+
+        console.log(`Plate ${plate} registered`);
+    });
+
 
     video = document.getElementById("camera");
     canvas = document.getElementById("overlay");
@@ -452,16 +495,52 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('plate-data-body');
         tbody.innerHTML = '';
 
-        data.forEach(s => {
+        data.forEach((s, index) => {
             tbody.innerHTML += `
                 <tr>
                     <td>${s.id}</td>
                     <td>${s.name}</td>
                     <td><strong>${s.plate}</strong></td>
                     <td>${s.registeredDate}</td>
-                </tr>`;
+                    <td>
+                        <button class="btn secondary" onclick="deletePlate(${index})">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
         });
     }
+
+    
+    function deletePlate(index) {
+        const plate = staffData[index].plate;
+
+        const confirmDelete = confirm(
+            `Are you sure you want to delete plate ${plate}?`
+        );
+        if (!confirmDelete) return;
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "remove_trusted_plate",
+                plate: plate
+            }));
+        }
+
+        staffData.splice(index, 1);
+
+        localStorage.setItem("staffData", JSON.stringify(staffData));
+        renderStaffData(staffData);
+        updateMetrics();
+
+        console.log(`Plate ${plate} deleted`);
+    }
+
+
+    window.deletePlate = deletePlate;
+
+
 
     function renderUserProfile() {
         document.getElementById('user-profile-summary').innerHTML = `
@@ -473,5 +552,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateMetrics() {
         document.getElementById('total-plates-count').textContent = staffData.length;
     }
+
+    renderStaffData(staffData);
+    updateMetrics();
 
 });

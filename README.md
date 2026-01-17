@@ -27,8 +27,9 @@ source .venv/bin/activate
 ## 3️⃣ Install Python Dependencies
 ```bash
 pip install -r requirements.txt
-## 4️⃣ Run Backend (FastAPI + WebSocket)
 ```
+## 4️⃣ Run Backend (FastAPI + WebSocket)
+
 ```bash
 uvicorn newApp:app --host 127.0.0.1 --port 5000 --reload
 Backend URL: http://127.0.0.1:5000

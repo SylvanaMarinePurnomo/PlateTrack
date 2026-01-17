@@ -8,15 +8,19 @@ Staff Parking Access Management
 git clone https://github.com/SylvanaMarinePurnomo/PlateTrack.git
 cd PlateTrack
 ## 2️⃣ Create Virtual Environment
+```bash
 🪟 Windows (PowerShell)
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.venv\Scripts\Activate.ps1
+
 🪟 Windows (CMD)
 python -m venv .venv
-.\.venv\Scripts\activate.bat
-macOS / Linux
+.venv\Scripts\activate.bat
+
+🐧 macOS / Linux
 python3 -m venv .venv
 source .venv/bin/activate
+```
 ## 3️⃣ Install Python Dependencies
 pip install -r requirements.txt
 ## 4️⃣ Run Backend (FastAPI + WebSocket)

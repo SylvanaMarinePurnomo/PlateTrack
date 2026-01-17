@@ -20,6 +20,7 @@ const deniedPlates = [];
 let isCameraRunning = false;
 let lastAuthorizedPlate = null;
 let foundAuthorizedPlate = false;
+
 const COMPANY_ACCOUNT = {
     username: "CGS_Company",
     password: "123",
@@ -28,6 +29,7 @@ const COMPANY_ACCOUNT = {
 };
 let staffData = JSON.parse(localStorage.getItem("staffData")) || [];
 
+// function code below utilizes AI to help connecting with websocket and process messages
 function initWebSocket() {
     ws = new WebSocket("ws://127.0.0.1:5000/ws");
 
@@ -67,9 +69,13 @@ function drawDetections(detections = currentDetections) {
     }
 
 function handleWebSocketMessage(event) {
+    // partf of code below utilizes Ai to help overcome with duplicate processing and
+    // UI redundancy updates. 
     if (!isCameraRunning) return;
     if (foundAuthorizedPlate) return;
 
+    // part of code below utilizes AI to help overcome problem of error WebSocket parsing 
+    // that happen due to non-JSON messages from the server. 
     let data;
     try {
         data = JSON.parse(event.data);
@@ -78,6 +84,8 @@ function handleWebSocketMessage(event) {
         return;
     }
 
+    // this part of code utilizes AI to help overcome problem 
+    // from the previous code where system could not be used without page reloading. 
     if (data.type === "reset") {
         currentDetections = [];
         lastAuthorizedPlate = null;
@@ -97,7 +105,7 @@ function handleWebSocketMessage(event) {
     if (detections.length === 0) return;
 
     detections.forEach(det => {
-        console.log("=== DETECTION DEBUG ===");
+        console.log("DETECTION DEBUG ");
         console.log("OCR Raw:", det.ocr_raw);
         console.log("OCR Cleaned:", det.ocr_cleaned);
         console.log("Final Match:", det.plate);
@@ -135,7 +143,8 @@ function handleWebSocketMessage(event) {
             confEl.textContent = `${(det.confidence * 100).toFixed(2)}%`;
         }
 
-
+        // this buffer code utilization is using AI help to increase accuracy by 
+        // reducing OCR fluctuations results per frame. 
         detectionBuffer.push({
             plate: det.plate,
             authorized: det.authorized,
@@ -238,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const messageEl = document.getElementById('register-message');
 
+        //this part of code utilizes AI to help synchronize frontend and backend state. 
         const existing = staffData.find(s => s.plate === plate);
 
         if (existing) {
@@ -314,6 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let detectInterval = null;
 
     async function startCamera() {
+        // this code below utilizes AI to help overcome with problem of 
+        // bringing previous state to new state each session. 
         foundAuthorizedPlate = false;
         lastAuthorizedPlate = null;
         currentDetections = [];
@@ -376,6 +388,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isDetecting || !isCameraRunning) return;
 
         const now = Date.now();
+        // part of code below utilizes AI to help overcome with OCR backend overload problem 
+        // 
         if (now - lastSendTime > SEND_INTERVAL) {
             sendFrame();
             lastSendTime = now;
@@ -391,7 +405,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
         const tempCanvas = document.createElement("canvas");
-       
+        
+        // this part of code utilizes AI to help overcome the 
+        // large payload size and high latency problem that impacted to the real time processing.
         const targetWidth = 640;
         const ratio = video.videoHeight / video.videoWidth;
 
@@ -517,7 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const plate = staffData[index].plate;
 
         const confirmDelete = confirm(
-            `Are you sure you want to delete plate ${plate}?`
+            `Plate deletion confirmation : by clicking yes, you are deleting the plate ${plate}?`
         );
         if (!confirmDelete) return;
 

@@ -17,8 +17,6 @@ from ultralytics import YOLO
 
 
 MODEL_PATH = "weights/best.pt"
-
-
 TRUSTED_PLATES_FILE = "trusted_plates.json"
 
 def load_trusted_plates():
@@ -63,7 +61,8 @@ ocr_engine = PaddleOCR(use_angle_cls=True, lang="en")
 
 print("Models loaded successfully.")
 
-
+# function code below references to 
+# https://www.geeksforgeeks.org/dsa/introduction-to-levenshtein-distance/
 def levenshtein_distance(s1, s2):
     if len(s1) > len(s2):
         s1, s2 = s2, s1
@@ -97,7 +96,11 @@ def find_best_match_fuzzy(ocr_text, trusted_plates, threshold):
                     best_match = plate
     return best_match
 
-
+# function code below utilizes AI to help overcome with
+# *error not enough values to unpack (expected 2, got 1)
+# the particular reason is, the previous code assumed paddleOCR will always return 2 values in tuple form
+# in fact, paddleOCR could possibly return empty list or different element count due to different conditions 
+# and due to failed OCR . 
 def get_best_ocr_text(ocr_results):
     if not ocr_results or not isinstance(ocr_results, list):
         return ""
@@ -115,6 +118,9 @@ def clean_plate(text):
     return re.sub(r"[^A-Z0-9]", "", text)
 
 
+# websocket implementation references to 
+# https://github.com/victor369basu/facial-emotion-recognition/blob/master/Resources/ui.png 
+# we used this reference to learn how to implement websocket in real time camera task. 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
@@ -171,14 +177,15 @@ async def websocket_endpoint(ws: WebSocket):
 
             h, w = img.shape[:2]
 
-            
             results = plate_model(img, imgsz=640, conf=0.15, verbose=False)[0]
             detections = []
 
             if results.boxes:
                 for box in results.boxes:
 
-                  
+                    # cls_id definition class is utilizes AI to help overcomme with
+                    # double bounding box problem (bbox for car, and bbox for plate)
+
                     cls_id = int(box.cls[0])
 
                     # class 0 -> class plat 
@@ -191,6 +198,8 @@ async def websocket_endpoint(ws: WebSocket):
                     pad_x = int((x2 - x1) * 0.05)
                     pad_y = int((y2 - y1) * 0.15)
 
+                    # padding implementation is utilizes AI to help overcome with 
+                    # non precision bounding box plat detection. 
                     x1 = max(0, x1 + pad_x)
                     y1 = max(0, y1 + pad_y)
                     x2 = min(w, x2 - pad_x)

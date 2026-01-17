@@ -6,8 +6,10 @@ Staff Parking Access Management
 - Link deployment : https://hect1x-kcartetalp.hf.space/ 
 
 ## 1️⃣ Clone Repository
+```bash
 git clone https://github.com/SylvanaMarinePurnomo/PlateTrack.git
 cd PlateTrack
+```
 ## 2️⃣ Create Virtual Environment
 ```bash
 🪟 Windows (PowerShell)
